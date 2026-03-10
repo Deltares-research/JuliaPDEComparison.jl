@@ -46,10 +46,20 @@ This is a list of Julia packages that can be used to implement PDE solvers in Ju
 - **GitHub**: [https://github.com/CliMA/Oceananigans.jl](https://github.com/CliMA/Oceananigans.jl)
 
 ### Trixi.jl
-- **Description**: A package for solving hyperbolic PDEs using high-order discontinuous Galerkin methods. It is designed for high-performance computing and has some support for GPU computing. It can be used to solve a wide range of PDEs related to fluid dynamics, electromagnetics, and other fields.
+- **Description**: A package for solving hyperbolic PDEs using high-order discontinuous Galerkin methods. It is designed for high-performance computing and has some support for GPU computing. It can be used to solve a wide range of PDEs related to fluid dynamics, electromagnetics, and other fields. For applications based on (variants of) the shallow water equations, there are relevant subpackages such as [TrixiShallowWater](https://github.com/trixi-framework/TrixiShallowWater.jl) and [TrixiBottomTopography](https://github.com/trixi-framework/TrixiBottomTopography.jl)
 - **GitHub**: [https://github.com/trixi-framework/Trixi.jl](https://github.com/trixi-framework/Trixi.jl)
 
+### GalerkinToolkit.jl
+- **Description**: A finite element library from the same developers as Gridap.jl, but with a different approach, similar to FeNics for python. It is currently underdevelopment and has less functionality compared with GridAp.jl. For instance, automatic differentiation and GPU support is on the whishlist but not yet implemented/tested.
+- **GitHub**: [https://galerkintoolkit.github.io/GalerkinToolkit.jl/dev/](https://galerkintoolkit.github.io/GalerkinToolkit.jl/dev/)
 
+### Ferrite.jl
+- **Description**: A finite element library with a lower level interface for defining element operations. Compared with many other FEM packages, here the user needs to assemble the relevant matrices themselves, granting more direct control but also requiring more lines of code/knowledge of FEM. Currently, likely not directly supported on GPU's. Support for automatic differentiation is not mentioned.
+- **GitHub**: [https://github.com/Ferrite-FEM/Ferrite.jl](https://github.com/Ferrite-FEM/Ferrite.jl)
+
+### VoronoiFVM.jl
+- **Description**: A finite volume package, based on the Voronoi finite volume method. It uses automatic differentiation for its calculations of jacobians. There is currently no support for GPUs.
+- **GitHub**: [https://github.com/WIAS-PDELib/VoronoiFVM.jl](https://github.com/WIAS-PDELib/VoronoiFVM.jl)
 ## Documentation and community resources
 - [https://juliagpu.org/](https://juliagpu.org/)
   - A website that provides resources and documentation for GPU computing in Julia, including tutorials, examples, and a list of packages that support GPU computing.
