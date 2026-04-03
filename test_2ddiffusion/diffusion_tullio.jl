@@ -7,42 +7,36 @@ include(joinpath(@__DIR__, "log_timings.jl"))
 using Tullio
 
 """
-    diffusion_operator(u, α, Δx, Δy) -> Matrix{Float64}
+    diffusion_operator!(Lu, u, α, Δx, Δy)
 
-Apply the scaled 2-D diffusion operator to field `u` using Tullio.jl:
+Apply the scaled 2-D diffusion operator to field `u` using Tullio.jl,
+writing the result into the pre-allocated array `Lu`:
 
-    L(u)[i,j] = α * (∂²u/∂x² + ∂²u/∂y²)
+    Lu[i,j] = α * (∂²u/∂x² + ∂²u/∂y²)
 
 The Laplacian is discretised with second-order centred finite differences.
-Periodic boundary conditions are imposed via a one-cell ghost layer before
-calling `@tullio`, avoiding the slow built-in `mod` indexing mode.
+Closed (zero Dirichlet) boundary conditions: the stencil is applied to the
+interior only (`i ∈ 2:Nx-1, j ∈ 2:Ny-1`); boundary rows/columns of `Lu`
+remain zero, so the boundary of `u` is never updated.
 
 # Arguments
+- `Lu` : pre-allocated output array of size (Nx, Ny), zeroed on first call.
 - `u`  : 2-D field of size (Nx, Ny), with `u[ix, iy]` indexing convention.
 - `α`  : scalar scaling coefficient (e.g. `Δt * D`).
 - `Δx` : uniform grid spacing in x.
 - `Δy` : uniform grid spacing in y.
 """
-function diffusion_operator(u::AbstractMatrix, α::Real, Δx::Real, Δy::Real)
-    Nx, Ny = size(u)
+function diffusion_operator!(Lu::AbstractMatrix, u::AbstractMatrix,
+                              α::Real, Δx::Real, Δy::Real)
     inv_Δx² = 1 / Δx^2
     inv_Δy² = 1 / Δy^2
 
-    # Pad with one periodic ghost cell on each side → size (Nx+2, Ny+2)
-    u_pad = similar(u, Nx + 2, Ny + 2)
-    u_pad[2:Nx+1, 2:Ny+1] .= u
-    u_pad[1,      2:Ny+1] .= u[Nx, :]   # left  ghost ← right  edge
-    u_pad[Nx+2,   2:Ny+1] .= u[1,  :]   # right ghost ← left   edge
-    u_pad[2:Nx+1, 1]      .= u[:, Ny]   # bottom ghost ← top   edge
-    u_pad[2:Nx+1, Ny+2]   .= u[:, 1]    # top   ghost ← bottom edge
-
-    # i+_ shifts output to 1-based; Tullio infers i ∈ 2:Nx+1 from u_pad bounds
-    @tullio Lu[i+_, j+_] := α * (
-        inv_Δx² * (u_pad[i+1, j] - 2u_pad[i, j] + u_pad[i-1, j]) +
-        inv_Δy² * (u_pad[i, j+1] - 2u_pad[i, j] + u_pad[i, j-1])
+    # No explicit range: Tullio infers i ∈ 2:Nx-1, j ∈ 2:Ny-1 from the offset
+    # accesses on u, so boundary rows/cols of Lu are never written.
+    @tullio Lu[i, j] = α * (
+        inv_Δx² * (u[i+1, j] - 2u[i, j] + u[i-1, j]) +
+        inv_Δy² * (u[i, j+1] - 2u[i, j] + u[i, j-1])
     )
-
-    return Lu
 end
 
 """
@@ -73,15 +67,17 @@ function simulate(
     nsteps = settings[:nsteps],
     Δt::Real = 0.4 * min(Δx, Δy)^2 / (2 * α * D),
 )
-    u = copy(u₀)
-    t = 0.0
+    Nx, Ny = size(u₀)
+    u  = copy(u₀)
+    Lu = zeros(eltype(u₀), Nx, Ny)   # boundary rows/cols must stay zero
+    t  = 0.0
 
     elapsed = @elapsed for _ in 1:nsteps
-        u .+= diffusion_operator(u, Δt * D, Δx, Δy)
+        diffusion_operator!(Lu, u, Δt * D, Δx, Δy)
+        @tullio u[i, j] += Lu[i, j]
         t  += Δt
     end
 
-    Nx, Ny = size(u₀)
     df = load_timings()
     log_timing!(df, "Tullio", get_backend(u₀), Nx, Ny, nsteps, elapsed * 1000)
 
