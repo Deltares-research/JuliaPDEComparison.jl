@@ -1,30 +1,29 @@
 # Native-Julia 2-D diffusion operator and Euler-forward simulator.
-# Include diffusion_common.jl first to get `settings`, `make_grid`, and `gaussian_bump`.
+
+include("diffusion_common.jl")
 
 """
-    diffusion_operator(u, α, Δx, Δy, D) -> Matrix{Float64}
+    diffusion_operator(u, α, Δx, Δy) -> Matrix{Float64}
 
 Apply the scaled 2-D diffusion operator to field `u`:
 
-    L(u)[i,j] = α * D * (∂²u/∂x² + ∂²u/∂y²)
+    L(u)[i,j] = α * (∂²u/∂x² + ∂²u/∂y²)
 
 The Laplacian is discretised with second-order centred finite differences.
 Periodic boundary conditions are used in both directions.
 
 # Arguments
 - `u`  : 2-D field of size (Nx, Ny), with `u[ix, iy]` indexing convention.
-- `α`  : scalar scaling coefficient (dimensionless).
+- `α`  : scalar scaling coefficient (e.g. `α * D`).
 - `Δx` : uniform grid spacing in x.
 - `Δy` : uniform grid spacing in y.
-- `D`  : diffusion coefficient.
 """
-function diffusion_operator(u::AbstractMatrix, α::Real, Δx::Real, Δy::Real, D::Real)
+function diffusion_operator(u::AbstractMatrix, α::Real, Δx::Real, Δy::Real)
     Nx, Ny = size(u)
     Lu = similar(u)
 
     inv_Δx² = 1 / Δx^2
     inv_Δy² = 1 / Δy^2
-    scale   = α * D
 
     @inbounds for iy in 1:Ny
         iy_prev = iy == 1  ? Ny : iy - 1
@@ -36,7 +35,7 @@ function diffusion_operator(u::AbstractMatrix, α::Real, Δx::Real, Δy::Real, D
             d2u_dx2 = (u[ix_next, iy] - 2u[ix, iy] + u[ix_prev, iy]) * inv_Δx²
             d2u_dy2 = (u[ix, iy_next] - 2u[ix, iy] + u[ix, iy_prev]) * inv_Δy²
 
-            Lu[ix, iy] = scale * (d2u_dx2 + d2u_dy2)
+            Lu[ix, iy] = α * (d2u_dx2 + d2u_dy2)
         end
     end
 
@@ -59,7 +58,7 @@ Returns the final field `u` and the elapsed simulation time `t`.
 - `Δx`    : grid spacing in x (keyword).
 - `Δy`    : grid spacing in y (keyword).
 - `nsteps`: number of time steps (keyword, default from `settings`).
-- `dt`    : time step size (keyword). If not provided, the CFL-stable value
+- `Δt`    : time step size (keyword). If not provided, the CFL-stable value
             `0.4 * min(Δx, Δy)^2 / (2 * α * D)` is used.
 """
 function simulate(
@@ -69,15 +68,48 @@ function simulate(
     Δx::Real,
     Δy::Real,
     nsteps = settings[:nsteps],
-    dt::Real = 0.4 * min(Δx, Δy)^2 / (2 * α * D),
+    Δt::Real = 0.4 * min(Δx, Δy)^2 / (2 * α * D),
 )
     u = copy(u₀)
     t = 0.0
 
     for _ in 1:nsteps
-        u .+= dt .* diffusion_operator(u, α, Δx, Δy, D)
-        t  += dt
+        u .+= diffusion_operator(u, Δt * D, Δx, Δy)
+        t  += Δt
     end
 
     return u, t
 end
+
+"""
+    run_simulation(; Lx, Ly, Nx, Ny, D, nsteps, σ, α) -> (u, sim_time, wall_time)
+
+Set up and run the full 2-D diffusion simulation using the native-Julia solver.
+
+Constructs the grid and initial Gaussian-bump condition from `settings` (all
+keyword arguments default to `settings` values), then calls `simulate` and
+measures wall-clock time with `@elapsed`.
+
+Returns the final field `u`, the elapsed simulation time `sim_time`, and the
+wall-clock runtime `wall_time` in seconds.
+"""
+function run_simulation(;
+    Lx     = settings[:Lx],
+    Ly     = settings[:Ly],
+    Nx     = settings[:Nx],
+    Ny     = settings[:Ny],
+    D      = settings[:D],
+    nsteps = settings[:nsteps],
+    σ      = settings[:σ],
+    α      = 1.0,
+)
+    x, y, Δx, Δy = make_grid(; Lx, Ly, Nx, Ny)
+    u₀ = gaussian_bump(x, y; σ)
+
+    wall_time = @elapsed u, sim_time = simulate(u₀, α; D, Δx, Δy, nsteps)
+
+    @info "run_simulation complete" Nx Ny nsteps sim_time wall_time
+    return u, sim_time, wall_time
+end
+
+u,sim_time,wall_time = run_simulation()
