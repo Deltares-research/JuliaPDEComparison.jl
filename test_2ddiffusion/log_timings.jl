@@ -8,6 +8,21 @@ const TIMINGS_FILE = joinpath(@__DIR__, "timings.csv")
 const KEY_COLS = [:package, :backend, :nx, :ny, :nsteps]
 
 """
+    get_backend(u) -> String
+
+Return a string identifying the compute backend from the array type of `u`:
+`"CUDA"`, `"AMDGPU"`, `"Metal"`, or `"CPU"`.
+Does not require importing any GPU package.
+"""
+function get_backend(u::AbstractArray)::String
+    m = string(parentmodule(typeof(u)))
+    startswith(m, "CUDA")   && return "CUDA"
+    startswith(m, "AMDGPU") && return "AMDGPU"
+    startswith(m, "Metal")  && return "Metal"
+    return Sys.cpu_info()[1].model
+end
+
+"""
     load_timings() -> DataFrame
 
 Load timings from CSV, or return an empty DataFrame with the correct schema.
@@ -23,7 +38,7 @@ function load_timings()::DataFrame
         ny        = Int[],
         nsteps    = Int[],
         time_ms   = Float64[],
-        timestamp = String[],
+        timestamp = DateTime[],
     )
 end
 
@@ -45,7 +60,7 @@ function log_timing!(df::DataFrame,
                      package::String, backend::String,
                      nx::Int, ny::Int, nsteps::Int,
                      time_ms::Float64)::DataFrame
-    timestamp = string(now())
+    timestamp = now()
     mask = (df.package .== package) .&
            (df.backend .== backend) .&
            (df.nx      .== nx)      .&
