@@ -118,4 +118,22 @@ function run_simulation(;
     return u, sim_time, wall_time
 end
 
-u, sim_time, wall_time = run_simulation()
+function main()
+    u, sim_time, wall_time = run_simulation()
+    @show sim_time wall_time
+end
+
+function main_sweep()
+    # Warmup run to trigger JIT compilation; result is overwritten by the first real sweep step
+    run_simulation(; Nx = 2^6, Ny = 2^6)
+
+    for p in 6:11
+        N = 2^p
+        @info "Sweeping" N
+        run_simulation(; Nx = N, Ny = N)
+    end
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main_sweep()
+end
