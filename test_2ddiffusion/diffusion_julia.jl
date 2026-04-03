@@ -1,6 +1,8 @@
 # Native-Julia 2-D diffusion operator and Euler-forward simulator.
 # Include diffusion_common.jl first to get `settings`, `make_grid`, and `gaussian_bump`.
 
+include(joinpath(@__DIR__, "log_timings.jl"))
+
 """
     diffusion_operator(u, α, Δx, Δy, D) -> Matrix{Float64}
 
@@ -74,10 +76,25 @@ function simulate(
     u = copy(u₀)
     t = 0.0
 
-    for _ in 1:nsteps
+    elapsed = @elapsed for _ in 1:nsteps
         u .+= dt .* diffusion_operator(u, α, Δx, Δy, D)
         t  += dt
     end
 
+    Nx, Ny = size(u₀)
+    df = load_timings()
+    log_timing!(df, "PlainJulia", "CPU", Nx, Ny, nsteps, elapsed * 1000)
+
     return u, t
+end
+
+# If this file is run directly, execute a test simulation and print the results.
+if abspath(PROGRAM_FILE) == @__FILE__
+    include(joinpath(@__DIR__, "diffusion_common.jl"))
+    println("Running 2-D diffusion simulation with Plain Julia implementation...")
+    x, y, Δx, Δy = make_grid()
+    u₀ = gaussian_bump(x, y)
+    D = settings[:D]
+    u, t = simulate(u₀, α; Δx, Δy)
+    println("Simulation completed in $(t) seconds.")
 end
