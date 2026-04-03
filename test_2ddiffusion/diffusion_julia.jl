@@ -5,25 +5,25 @@ include("diffusion_common.jl")
 include(joinpath(@__DIR__, "log_timings.jl"))
 
 """
-    diffusion_operator(u, α, Δx, Δy) -> Matrix{Float64}
+    diffusion_operator!(Lu, u, α, Δx, Δy)
 
-Apply the scaled 2-D diffusion operator to field `u`:
+Apply the scaled 2-D diffusion operator to field `u`, writing the result
+into the pre-allocated array `Lu`:
 
-    L(u)[i,j] = α * (∂²u/∂x² + ∂²u/∂y²)
+    Lu[i,j] = α * (∂²u/∂x² + ∂²u/∂y²)
 
 The Laplacian is discretised with second-order centred finite differences.
 Periodic boundary conditions are used in both directions.
 
 # Arguments
+- `Lu` : pre-allocated output array of size (Nx, Ny).
 - `u`  : 2-D field of size (Nx, Ny), with `u[ix, iy]` indexing convention.
-- `α`  : scalar scaling coefficient (e.g. `α * D`).
+- `α`  : scalar scaling coefficient (e.g. `Δt * D`).
 - `Δx` : uniform grid spacing in x.
 - `Δy` : uniform grid spacing in y.
 """
-function diffusion_operator(u::AbstractMatrix, α::Real, Δx::Real, Δy::Real)
+function diffusion_operator!(Lu::AbstractMatrix, u::AbstractMatrix, α::Real, Δx::Real, Δy::Real)
     Nx, Ny = size(u)
-    Lu = similar(u)
-
     inv_Δx² = 1 / Δx^2
     inv_Δy² = 1 / Δy^2
 
@@ -40,8 +40,6 @@ function diffusion_operator(u::AbstractMatrix, α::Real, Δx::Real, Δy::Real)
             Lu[ix, iy] = α * (d2u_dx2 + d2u_dy2)
         end
     end
-
-    return Lu
 end
 
 """
@@ -72,17 +70,18 @@ function simulate(
     nsteps = settings[:nsteps],
     Δt::Real = 0.4 * min(Δx, Δy)^2 / (2 * α * D),
 )
-    u = copy(u₀)
-    t = 0.0
+    Nx, Ny = size(u₀)
+    u  = copy(u₀)
+    Lu = zeros(eltype(u₀), Nx, Ny)
+    t  = 0.0
 
     elapsed = @elapsed for _ in 1:nsteps
-        u .+= diffusion_operator(u, Δt * D, Δx, Δy)
+        diffusion_operator!(Lu, u, Δt * D, Δx, Δy)
+        u .+= Lu
         t  += Δt
     end
-
-    Nx, Ny = size(u₀)
     df = load_timings()
-    log_timing!(df, "PlainJulia", get_backend(u₀), Nx, Ny, nsteps, elapsed * 1000)
+    log_timing!(df, "PlainJulia", get_backend(u₀), 1, Nx, Ny, nsteps, elapsed * 1000)
 
     return u, t
 end

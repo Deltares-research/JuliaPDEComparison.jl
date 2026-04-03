@@ -79,7 +79,7 @@ function simulate(
     end
 
     df = load_timings()
-    log_timing!(df, "Tullio", get_backend(u₀), Nx, Ny, nsteps, elapsed * 1000)
+    log_timing!(df, "Tullio", get_backend(u₀), Threads.nthreads(), Nx, Ny, nsteps, elapsed * 1000)
 
     return u, t
 end

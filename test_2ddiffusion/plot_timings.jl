@@ -11,8 +11,14 @@ if isempty(df)
     exit(0)
 end
 
-# Each (package, backend) pair becomes a separate series
-groups = groupby(df, [:package, :backend])
+# Each (package, backend, nthreads) triple becomes a separate series
+groups = groupby(df, [:package, :backend, :nthreads])
+
+# Color per package, marker shape per thread count
+packages      = unique(df.package)
+thread_counts = sort(unique(df.nthreads))
+pkg_colors    = Dict(p => c for (p, c) in zip(packages, palette(:tab10)))
+thread_markers = Dict(n => m for (n, m) in zip(thread_counts, [:circle, :square, :diamond, :utriangle, :dtriangle]))
 
 plt = plot(
     xlabel = "N  (grid points per side)",
@@ -25,13 +31,16 @@ plt = plot(
 )
 
 for g in groups
-    pkg     = g.package[1]
-    backend = g.backend[1]
-    rows    = sort(g, :nx)
+    pkg      = g.package[1]
+    nthreads = g.nthreads[1]
+    rows     = sort(g, :nx)
+    label    = nthreads == 1 ? pkg : "$pkg / $(nthreads)t"
     plot!(plt, rows.nx, rows.time_ms;
-        label   = "$pkg / $backend",
-        marker  = :circle,
-        lw      = 2,
+        label        = label,
+        color        = pkg_colors[pkg],
+        marker       = thread_markers[nthreads],
+        markercolor  = pkg_colors[pkg],
+        lw           = 2,
     )
 end
 
