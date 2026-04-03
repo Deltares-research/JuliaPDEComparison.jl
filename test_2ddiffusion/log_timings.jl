@@ -16,7 +16,7 @@ Does not require importing any GPU package.
 """
 function get_backend(u::AbstractArray)::String
     m = string(parentmodule(typeof(u)))
-    startswith(m, "CUDA")   && return "CUDA"
+    startswith(m, "CUDA")   && return CUDA.name(CUDA.device())
     startswith(m, "AMDGPU") && return "AMDGPU"
     startswith(m, "Metal")  && return "Metal"
     return Sys.cpu_info()[1].model
@@ -29,7 +29,7 @@ Load timings from CSV, or return an empty DataFrame with the correct schema.
 """
 function load_timings()::DataFrame
     if isfile(TIMINGS_FILE)
-        return CSV.read(TIMINGS_FILE, DataFrame)
+        return CSV.read(TIMINGS_FILE, DataFrame; stringtype=String)
     end
     return DataFrame(
         package  = String[],
