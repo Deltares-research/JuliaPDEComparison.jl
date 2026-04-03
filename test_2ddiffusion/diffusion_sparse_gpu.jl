@@ -47,17 +47,17 @@ function make_1d_diffusion_matrix(N::Int, Δ::Real)
 end
 
 """
-    diffusion_operator(u, α, Dx, Dy) -> CuMatrix{Float64}
+    diffusion_operator(u, α, Dx, Dy) -> CuMatrix{Float32}
 
 Apply the scaled 2D diffusion operator to field `u` on the GPU using prebuilt
 CUDA sparse second-derivative matrices `Dx` and `Dy`:
 
-    L(u) = α * (Dx * u + (Dy * u')')
+    L(u) = α * (Dx * u + u * Dy)
 
-`Dx` (Nx×Nx) acts on the x-direction (left-multiply, sparse × dense).
-`Dy` (Ny×Ny) acts on the y-direction: because CUSPARSE only supports
-sparse × dense, the right-multiply `u * Dy'` is rewritten as `(Dy * u')'`,
-which is equivalent since `Dy` is symmetric. Both matrices include the 1/Δ² scaling.
+`Dx` (Nx×Nx) acts on the x-direction (sparse × dense).
+`Dy` (Ny×Ny) acts on the y-direction (dense × sparse). Since `Dy` is symmetric,
+`u * Dy = u * Dy'`. Both directions work with Float32 CuSparse matrices.
+Both matrices include the 1/Δ² scaling.
 
 # Arguments
 - `u`  : 2D field on the GPU, size (Nx, Ny).
@@ -66,7 +66,8 @@ which is equivalent since `Dy` is symmetric. Both matrices include the 1/Δ² sc
 - `Dy` : 1D CUDA sparse second-derivative matrix in y, size (Ny, Ny).
 """
 function diffusion_operator(u::CuMatrix, α::Real, Dx::CuSparseMatrix, Dy::CuSparseMatrix)
-    return α .* (Dx * u .+ (Dy * u')')
+    # Dy is symmetric, so u*Dy = u*Dy'. dense×sparse works with Float32 CuSparse.
+    return α .* (Dx * u .+ u * Dy)
 end
 
 """
