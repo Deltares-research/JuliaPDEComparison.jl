@@ -13,10 +13,12 @@ into the pre-allocated array `Lu`:
     Lu[i,j] = α * (∂²u/∂x² + ∂²u/∂y²)
 
 The Laplacian is discretised with second-order centred finite differences.
-Periodic boundary conditions are used in both directions.
+Closed (zero Dirichlet) boundary conditions: the stencil is applied to the
+interior only (`ix ∈ 2:Nx-1, iy ∈ 2:Ny-1`); boundary rows/columns of `Lu`
+remain zero, so the boundary of `u` is never updated.
 
 # Arguments
-- `Lu` : pre-allocated output array of size (Nx, Ny).
+- `Lu` : pre-allocated output array of size (Nx, Ny), zeroed on first call.
 - `u`  : 2-D field of size (Nx, Ny), with `u[ix, iy]` indexing convention.
 - `α`  : scalar scaling coefficient (e.g. `Δt * D`).
 - `Δx` : uniform grid spacing in x.
@@ -27,16 +29,10 @@ function diffusion_operator!(Lu::AbstractMatrix, u::AbstractMatrix, α::Real, Δ
     inv_Δx² = 1 / Δx^2
     inv_Δy² = 1 / Δy^2
 
-    @inbounds for iy in 1:Ny
-        iy_prev = iy == 1  ? Ny : iy - 1
-        iy_next = iy == Ny ?  1 : iy + 1
-        for ix in 1:Nx
-            ix_prev = ix == 1  ? Nx : ix - 1
-            ix_next = ix == Nx ?  1 : ix + 1
-
-            d2u_dx2 = (u[ix_next, iy] - 2u[ix, iy] + u[ix_prev, iy]) * inv_Δx²
-            d2u_dy2 = (u[ix, iy_next] - 2u[ix, iy] + u[ix, iy_prev]) * inv_Δy²
-
+    @inbounds for iy in 2:Ny-1
+        for ix in 2:Nx-1
+            d2u_dx2 = (u[ix+1, iy] - 2u[ix, iy] + u[ix-1, iy]) * inv_Δx²
+            d2u_dy2 = (u[ix, iy+1] - 2u[ix, iy] + u[ix, iy-1]) * inv_Δy²
             Lu[ix, iy] = α * (d2u_dx2 + d2u_dy2)
         end
     end

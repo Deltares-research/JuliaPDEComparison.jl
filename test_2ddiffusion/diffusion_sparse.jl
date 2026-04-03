@@ -5,7 +5,8 @@
 #
 #   ∇²u ≈ Dx * u + u * Dy'
 #
-# where Dx (Nx×Nx) and Dy (Ny×Ny) are periodic tridiagonal [1,-2,1]/Δ² matrices.
+# where Dx (Nx×Nx) and Dy (Ny×Ny) are tridiagonal [1,-2,1]/Δ² matrices with
+# zero boundary rows/columns (closed / zero-Dirichlet boundary conditions).
 
 include("diffusion_common.jl")
 include("log_timings.jl")
@@ -15,9 +16,10 @@ using SparseArrays
 """
     make_1d_diffusion_matrix(N, Δ) -> SparseMatrixCSC{Float64, Int64}
 
-Build the periodic 1D second-derivative sparse matrix of size N×N with the
-centred finite-difference stencil `[1, -2, 1] / Δ²` and periodic boundary
-conditions.
+Build the 1D second-derivative sparse matrix of size N×N with the centred
+finite-difference stencil `[1, -2, 1] / Δ²` and closed (zero Dirichlet)
+boundary conditions. Rows 1 and N are all-zero so the boundary values of
+`u` are never updated.
 """
 function make_1d_diffusion_matrix(N::Int, Δ::Real)
     rows = Int64[]
@@ -26,12 +28,9 @@ function make_1d_diffusion_matrix(N::Int, Δ::Real)
 
     inv_Δ² = 1 / Δ^2
 
-    for i in 1:N
-        i_prev = i == 1 ? N : i - 1
-        i_next = i == N ? 1 : i + 1
-
+    for i in 2:N-1
         push!(rows, i, i,  i)
-        push!(cols, i_prev, i, i_next)
+        push!(cols, i-1, i, i+1)
         push!(vals, inv_Δ², -2inv_Δ², inv_Δ²)
     end
 
@@ -103,7 +102,7 @@ function simulate(
     end
 
     df = load_timings()
-    log_timing!(df, "SparseMat", get_backend(u₀), Nx, Ny, nsteps, elapsed * 1000)
+    log_timing!(df, "SparseMat", get_backend(u₀), 1, Nx, Ny, nsteps, elapsed * 1000)
 
     return u, t
 end
